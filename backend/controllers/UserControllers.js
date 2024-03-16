@@ -1,27 +1,29 @@
-const User = require("../models/UserSchema");
 const asyncHandler = require("express-async-handler");
+const User = require("../models/UserSchema");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const generateToken = (id) => {
-  return jwt.sign({ id: id }, process.env.jwtkey, { expiresIn: "30d" });
-};
-
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    res.json({
-      msg: "please fill all details",
-    });
-  }
-  const userExist = await User.findOne({ email: email });
-  if (userExist) {
+  const { email, name, password } = req.body;
+
+  if (!email || !name || !password) {
     res.status(400);
-    // throw new Error("user already exist");
-    res.json({ msg: "user already exist" });
+    throw new Error("Please Fill All Details");
   }
 
+  // Find if user already exist
+
+  const userExist = await User.findOne({ email: email });
+
+  if (userExist) {
+    res.status(401);
+    throw new Error("User Already Exist");
+  }
+
+  // Generate Salt
   const salt = await bcrypt.genSalt(10);
+
+  // Hash Password
   const hashedPassword = await bcrypt.hash(password, salt);
 
   const user = await User.create({
@@ -31,47 +33,63 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    res.status(201).json({
+    res.status(201);
+    res.json({
       id: user._id,
       name: user.name,
       email: user.email,
-      password: user.password,
       token: generateToken(user._id),
     });
-  } else {
-    res.send(400).json({
-      msg: "user not create",
-    });
   }
-
-  //   res.json({
-  //     name,
-  //     email,
-  //     password,
-  //   });
 });
 
-const loginuser = asyncHandler(async (req, res) => {
+// Login User
+
+const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    res.status(401).json({
-      msg: "please fill all details",
-    });
+    res.status(400);
+    throw new Error("Please Fill All Details");
   }
 
   const user = await User.findOne({ email: email });
+
+  // Check User & Pass
+
   if (user && (await bcrypt.compare(password, user.password))) {
-    res.status(201).json({
-      id: user._id,
-      email: user.email,
-      token: generateToken(user._id),
-    });
+    res.status(200);
+    user.isAdmin
+      ? res.json({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          token: generateToken(user._id),
+          isAdmin: user.isAdmin,
+        })
+      : res.json({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          token: generateToken(user._id),
+        });
   } else {
-    res.status(400).json({
-      msg: "envalid credentials",
-    });
+    res.status(401);
+    throw new Error("Invalid Credentials");
   }
 });
 
-module.exports = { registerUser, loginuser };
+// Protected Route Example
+const getMe = asyncHandler(async (req, res) => {
+  res.json(req.user);
+});
+
+// Generate Token
+const generateToken = (id) => {
+  const token = jwt.sign({ id: id }, process.env.jwtkey, {
+    expiresIn: "1d",
+  });
+  return token;
+};
+
+module.exports = { registerUser, loginUser, getMe };
