@@ -1,5 +1,6 @@
 const express = require("express");
 require("dotenv").config();
+const cors = require('cors');
 const connect = require("../backend/config/db_config");
 const { router } = require("./routers/UserRoute");
 // const { Trouter } = require("./routers/TicketRoute");
@@ -14,7 +15,12 @@ app.get("/data", (req, res) => {
     msg:"success"
   })
 });
-
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.listen(port, () => {
   console.log(`server is running on ${port}`);
 });
